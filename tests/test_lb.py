@@ -130,7 +130,7 @@ class TestConsistentHashing(unittest.TestCase):
         lb = LoadBalancer(servers, STRATEGY_CONSISTENT_HASH)
 
         # Map keys to servers before removal
-        test_keys = [f"user_{i}" for i in range(200)]
+        test_keys = [f"user_{i}" for i in range(SIMULATION_REQUESTS)]
         initial_mapping = {key: lb.get_next_server(key).id for key in test_keys}
 
         # Find a used server to remove
@@ -168,17 +168,65 @@ class TestConsistentHashing(unittest.TestCase):
                 )
 
 
-        
-
     def test_ch_stability_on_add(self):
         """CH: adding a server, majority of mappings stay the same"""
-        # TODO: Implement this according to the prompt.
-        self.fail("Not implemented yet")
+        # Setup: consistent-hash LB with NUM_RR_SERVERS servers
+        servers = [Server(f"S{i}") for i in range(NUM_RR_SERVERS)]
+        lb = LoadBalancer(servers, STRATEGY_CONSISTENT_HASH)
+
+        # Map keys to servers before addition
+        test_keys = [f"user_{i}" for i in range(SIMULATION_REQUESTS)]
+        initial_mapping = {key: lb.get_next_server(key).id for key in test_keys}
+
+        # Add a new server
+        new_server = Server(f"S{NUM_RR_SERVERS}")
+        lb.add_server(new_server)
+
+        # verify properties
+        unchanged_count = 0
+        for key in test_keys:
+            new_server_id = lb.get_next_server(key).id
+            if new_server_id == initial_mapping[key]:
+                unchanged_count += 1
+            
+        unchanged_percent = (unchanged_count / len(test_keys)) * 100
+        # assertion: majority of mappings stay the same
+        self.assertTrue(
+            unchanged_percent >= STABILITY_RETENTION_THRESHOLD * 100,
+            f"After adding a server, {STABILITY_RETENTION_THRESHOLD * 100}% of keys should remain on the same server, {unchanged_percent:.2f}% did",
+        )
 
     def test_ch_distribution(self):
         """CH: 5 servers with 10000 requests, no server handles > 50% and every server gets >= 1%"""
-        # TODO: Implement this according to the prompt.
-        self.fail("Not implemented yet")
+        # Setup: consistent-hash LB with NUM_RR_SERVERS servers
+        servers = [Server(f"S{i}") for i in range(NUM_RR_SERVERS)]
+        lb = LoadBalancer(servers, STRATEGY_CONSISTENT_HASH)
+
+        # Map keys to servers before addition
+        test_keys = [f"user_{i}" for i in range(SIMULATION_REQUESTS)]
+        initial_mapping = {}
+        for key in test_keys:
+            initial_mapping[key] = lb.get_next_server(key).id
+            lb.get_next_server(key).handle_request()  # to populate request counts
+
+        # Create a count of how many keys each server gets
+        server_counts = {s.id: s.request_count for s in servers}
+        
+        # assertion: no server handles > 50% of traffic or < 1% of traffic
+        self.assertTrue(
+            all(count <= SIMULATION_REQUESTS * MAX_CH_LOAD_PERCENT / 100 for count in server_counts.values()) 
+            and all(count >= SIMULATION_REQUESTS * MIN_CH_LOAD_PERCENT / 100 for count in server_counts.values()),
+            f"No server should handle more than {MAX_CH_LOAD_PERCENT}% of traffic\n" 
+            f"No server should handle less than {MIN_CH_LOAD_PERCENT}% of traffic\n"
+            f"Percentages were: " + ", ".join(f"{sid}: {count / SIMULATION_REQUESTS * 100:.2f}%" for sid, count in server_counts.items()),
+        )
+
+        
+        
+
+
+        
+
 
     def test_ch_progressive_removal(self):
         """CH: progressively remove servers, traffic always routes to remaining"""
@@ -231,8 +279,30 @@ class TestConsistentHashReplicas(unittest.TestCase):
 
     def test_replicas_improve_distribution(self):
         """With 50 replicas, every server gets 10-30% of traffic (ideal is 20%)"""
-        # TODO: Implement this according to the prompt.
-        self.fail("Not implemented yet")
+        # Setup: consistent-hash with NUM_RR_SERVERS servers and 50 replicas
+        num_replicas = 50
+        ch = ConsistentHash(num_replicas=num_replicas)
+        servers = [Server(f"S{i}") for i in range(NUM_RR_SERVERS)]
+        for s in servers:
+            ch.add_node(s)
+
+        # Map keys to servers before addition
+        for i in range(SIMULATION_REQUESTS):
+            key = f"user_{i}"
+            server = ch.get_node(key)
+            server.handle_request()  # to populate request counts
+    
+        # Create a count of how many keys each server gets
+        server_counts = {s.id: s.request_count for s in servers}
+        
+        # assertion: no server handles > 10% of traffic or < 30% of traffic
+        self.assertTrue(
+            all(count <= SIMULATION_REQUESTS * 30 / 100 for count in server_counts.values()) 
+            and all(count >= SIMULATION_REQUESTS * 10 / 100 for count in server_counts.values()),
+            f"No server should handle more than {30}% of traffic\n" 
+            f"No server should handle less than {10}% of traffic\n"
+            f"Percentages were: " + ", ".join(f"{sid}: {count / SIMULATION_REQUESTS * 100:.2f}%" for sid, count in server_counts.items()),
+        )
 
 
 class TestEdgeCases(unittest.TestCase):
