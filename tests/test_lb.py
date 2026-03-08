@@ -1,3 +1,6 @@
+# Author: Gilad Bitton
+# RedID: 130621085
+
 import unittest
 from server import Server
 from consistent_hash import ConsistentHash, DEFAULT_NUM_REPLICAS

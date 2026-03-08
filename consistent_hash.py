@@ -1,3 +1,6 @@
+# Author: Gilad Bitton
+# RedID: 130621085
+
 import hashlib
 import bisect
 

@@ -1,3 +1,6 @@
+# Author: Gilad Bitton
+# RedID: 130621085
+
 from consistent_hash import ConsistentHash
 
 # Strategy constants
@@ -54,11 +57,13 @@ class LoadBalancer:
         elif self.strategy == STRATEGY_WEIGHTED:
             self.weighted_servers = [s for s in self.weighted_servers if s.id != server_id]
         
-
+    # Gets the next server based on the load balancing strategy.
     def get_next_server(self, request_id):
+        # if no servers are available, return None
         if not self.servers:
             return None
 
+        # For round robin, we simply return the next server in the list and update the current index.
         if self.strategy == STRATEGY_ROUND_ROBIN:
             server = self.servers[self.current_index]
             self.current_index = (self.current_index + 1) % len(self.servers)
