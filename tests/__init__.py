@@ -1,1 +1,0 @@
-self.weighted_servers = []

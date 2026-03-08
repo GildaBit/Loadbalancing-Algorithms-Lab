@@ -125,8 +125,50 @@ class TestConsistentHashing(unittest.TestCase):
 
     def test_ch_resilience_and_stability(self):
         """CH: removed server gets no traffic; unaffected keys stay on same server"""
-        # TODO: Implement this according to the prompt.
-        self.fail("Not implemented yet")
+        # Setup: consistent-hash LB with NUM_RR_SERVERS servers
+        servers = [Server(f"S{i}") for i in range(NUM_RR_SERVERS)]
+        lb = LoadBalancer(servers, STRATEGY_CONSISTENT_HASH)
+
+        # Map keys to servers before removal
+        test_keys = [f"user_{i}" for i in range(200)]
+        initial_mapping = {key: lb.get_next_server(key).id for key in test_keys}
+
+        # Find a used server to remove
+        removed_server_id = None
+        for sid in {s.id for s in servers}:
+            if any(v == sid for v in initial_mapping.values()):
+                removed_server_id = sid
+                break
+        
+        if removed_server_id is None:
+            removed_server_id = servers[0].id  # fallback if no server was mapped (unlikely)
+        
+        # remove the server from lb
+        lb.remove_server(removed_server_id)
+
+        # Verify properties
+        for key in test_keys:
+            # If the key was mapped to the removed server, it should now map to a different server
+            new_server = lb.get_next_server(key)
+            self.assertIsNotNone(new_server, f"Key {key} should still map to a server after removal")
+
+            # assertion (a) removed server gets no traffic
+            self.assertNotEqual(
+                new_server.id, 
+                removed_server_id,
+                f"Key {key} should not map to removed server {removed_server_id}",
+            )
+
+            # assertion (b) unaffected keys stay on same server
+            if initial_mapping[key] != removed_server_id:
+                self.assertEqual(
+                    new_server.id,
+                    initial_mapping[key],
+                    f"Key {key} should still map to same server {initial_mapping[key]} after removal",
+                )
+
+
+        
 
     def test_ch_stability_on_add(self):
         """CH: adding a server, majority of mappings stay the same"""

@@ -12,6 +12,9 @@ class LoadBalancer:
         self.strategy = strategy
         self.current_index = 0
         
+        # weighted server list for weighted strategy
+        self.weighted_servers = []
+        
         # Consistent Hash helper
         self.consistent_hash = ConsistentHash()
         
@@ -34,11 +37,18 @@ class LoadBalancer:
     # remove server from both main and internal lists
     def remove_server(self, server_id):
         # new server list without the removed server
-        self.servers = [s for s in self.servers if s.id != server_id]
+        server_obj = next((s for s in self.servers if s.id == server_id), None)
+
+        # if server not found, return early
+        if not server_obj:
+            return
+
+        # removes the server from the main servers list
+        self.servers.remove(server_obj)
 
         # Calls the internal remove method for the hash ring implementation
         if self.strategy == STRATEGY_CONSISTENT_HASH:
-            self.consistent_hash.remove_node(server_id)
+            self.consistent_hash.remove_node(server_obj)
         
         # For weighted strategy, we need to remove all instances of the server from the weighted_servers list.
         elif self.strategy == STRATEGY_WEIGHTED:
